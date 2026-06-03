@@ -1,0 +1,12 @@
+{
+  "id": "case_003",
+  "description": "No regression — same O(n) complexity, refactored loop style only",
+  "pre_code": "def sum_list(nums):\n    total = 0\n    for n in nums:\n        total += n\n    return total",
+  "post_code": "def sum_list(nums):\n    total = 0\n    i = 0\n    while i < len(nums):\n        total += nums[i]\n        i += 1\n    return total",
+  "function_name": "sum_list",
+  "expected_pre_class": "O(n)",
+  "expected_post_class": "O(n)",
+  "expected_regression": false,
+  "expected_severity": "none",
+  "fix_should_restore_to": "O(n)"
+}

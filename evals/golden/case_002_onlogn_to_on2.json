@@ -1,0 +1,12 @@
+{
+  "id": "case_002",
+  "description": "O(n log n) → O(n^2): sorted() replaced by nested loop accumulation",
+  "pre_code": "def rank_values(arr):\n    return sorted(arr, reverse=True)",
+  "post_code": "def rank_values(arr):\n    acc = 0\n    for i in range(len(arr)):\n        for j in range(len(arr)):\n            acc += arr[i] + arr[j]\n    return list(arr)",
+  "function_name": "rank_values",
+  "expected_pre_class": "O(n log n)",
+  "expected_post_class": "O(n^2)",
+  "expected_regression": true,
+  "expected_severity": "moderate",
+  "fix_should_restore_to": "O(n log n)"
+}
