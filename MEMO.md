@@ -8,10 +8,14 @@ AlgoSentinel is an autonomous agent that detects algorithmic complexity regressi
 - **FunctionAnalysisSubagent** with its own `genai.Client` and `_messages` list, scoped to sandbox/complexity tools
 - **AgentLoop** parent orchestrator with **ContextManager** compression every 6 tool calls and full plan retention in every system prompt
 - **Docker sandbox** profiling at multiple input sizes, **scipy** curve fitting, and regression detection via `ComplexityOrder` comparison
-- **FastAPI webhook**, CLI scripts, eval harness with 5 golden cases, unit and integration tests
-- Production scaffolding: structlog JSON logging, tenacity `@with_retry`, `TokenBucketRateLimiter`, typed exception hierarchy
+- **FastAPI webhook**, CLI scripts, eval harness (5 golden cases, 6 evaluations), unit and integration tests
+- Production scaffolding: structlog JSON logging, tenacity `@with_retry`, a process-wide `TokenBucketRateLimiter`, and a typed exception hierarchy that separates retryable (`RateLimitError`) from fatal (`QuotaExhaustedError`) failures
 
-Unit tests for registry, curve fit, context compression, retry, and rate limiter run without Docker. Sandbox and pipeline integration tests require Docker; subagent tests require `GEMINI_API_KEY`.
+Unit tests for registry, curve fit, context compression, retry, and rate limiter run without Docker. Sandbox and pipeline integration tests require Docker; subagent tests require `GEMINI_API_KEY`. Current status: `pytest` → 23 passed, 3 skipped; eval harness → F1 1.00.
+
+## Notes for the reviewer
+
+`gemini-2.0-flash` (my original default) was **shut down on 2026-06-01**, mid-window. The retirement surfaces as a `429 ... limit: 0`, which looks like a quota error but is not — I migrated the default to `gemini-2.5-flash` and verified the live agent against it. One practical wall remains: a new free-tier key is capped at **20 model requests/day/model**, and a full audit needs ~25–35, so an unattended live run does not fit on free tier. `scripts/full_audit.py` runs the identical pipeline deterministically (no model calls) for that case, and the rate limiter is now shared across the parent and subagents so they draw from one bucket rather than each holding their own.
 
 ## What I Cut
 

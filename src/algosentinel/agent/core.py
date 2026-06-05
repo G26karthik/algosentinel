@@ -11,8 +11,12 @@ from algosentinel.config import settings
 from algosentinel.models.reports import AuditSummary
 from algosentinel.models.tools import ToolCallRecord
 from google.genai import errors as genai_errors
-from algosentinel.resilience.errors import FatalError, RateLimitError
-from algosentinel.resilience.rate_limiter import TokenBucketRateLimiter
+from algosentinel.resilience.errors import (
+    FatalError,
+    QuotaExhaustedError,
+    RateLimitError,
+)
+from algosentinel.resilience.rate_limiter import get_shared_rate_limiter
 from algosentinel.resilience.retry import with_retry
 from algosentinel.tools.registry import ToolRegistry
 
@@ -26,7 +30,7 @@ class AgentLoop:
 
     def __init__(self):
         self._client = genai.Client(api_key=settings.gemini_api_key)
-        self._rate_limiter = TokenBucketRateLimiter(rate_per_minute=settings.gemini_max_rpm)
+        self._rate_limiter = get_shared_rate_limiter()
         self._log = logger.bind(component="AgentLoop")
         self._reports: list = []
 
@@ -42,10 +46,22 @@ class AgentLoop:
                 config=genai_types.GenerateContentConfig(
                     tools=[tool_config],
                     max_output_tokens=settings.gemini_max_tokens,
+                    thinking_config=genai_types.ThinkingConfig(
+                        thinking_budget=settings.gemini_thinking_budget
+                    ),
                 ),
             )
         except genai_errors.ClientError as e:
             if e.code == 429:
+                # Per-day quota cannot recover within the session; fail fast
+                # instead of retrying and burning the remaining daily allowance.
+                if "PerDay" in str(e):
+                    raise QuotaExhaustedError(
+                        "Gemini daily free-tier quota exhausted "
+                        "(GenerateRequestsPerDayPerProjectPerModel). "
+                        "Enable billing, switch GEMINI_MODEL, or wait for the "
+                        "daily reset. Original error: " + str(e)
+                    ) from e
                 raise RateLimitError(str(e)) from e
             raise
 
@@ -100,8 +116,33 @@ class AgentLoop:
             if not response.candidates:
                 continue
 
+            content = response.candidates[0].content
+            if content is None or not content.parts:
+                self._log.warning(
+                    "empty_model_response",
+                    iteration=iteration,
+                    finish_reason=str(
+                        getattr(response.candidates[0], "finish_reason", None)
+                    ),
+                )
+                messages.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": (
+                                    "Continue the audit by calling the next required "
+                                    "tool, or call optimizer__summarize_audit_findings "
+                                    "if every PR has been reviewed."
+                                )
+                            }
+                        ],
+                    }
+                )
+                continue
+
             has_tool_call = False
-            for part in response.candidates[0].content.parts:
+            for part in content.parts:
                 if part.function_call:
                     has_tool_call = True
                     call_number += 1

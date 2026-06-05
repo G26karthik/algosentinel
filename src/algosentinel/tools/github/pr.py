@@ -7,7 +7,7 @@ from algosentinel.models.github import ChangedFile, Diff, PRDetails
 from algosentinel.models.reports import ComplexityReport
 from algosentinel.models.sandbox import FunctionCode
 from algosentinel.resilience.errors import GitHubNotFoundError, GitHubRateLimitError
-from algosentinel.resilience.rate_limiter import TokenBucketRateLimiter
+from algosentinel.resilience.rate_limiter import get_shared_rate_limiter
 from algosentinel.resilience.retry import with_retry
 from algosentinel.tools.registry import tool
 
@@ -200,10 +200,9 @@ def spawn_function_analysis_subagent(
 ) -> ComplexityReport:
     from algosentinel.agent.subagent import FunctionAnalysisSubagent
 
-    limiter = TokenBucketRateLimiter(rate_per_minute=settings.gemini_max_rpm)
     subagent = FunctionAnalysisSubagent(
         function_code=inp.function_code,
         function_code_after=inp.function_code_after,
-        rate_limiter=limiter,
+        rate_limiter=get_shared_rate_limiter(),
     )
     return subagent.run()

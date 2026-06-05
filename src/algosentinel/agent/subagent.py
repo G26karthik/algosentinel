@@ -7,7 +7,13 @@ from google.genai import types as genai_types
 from algosentinel.config import settings
 from algosentinel.models.reports import ComplexityReport
 from algosentinel.models.sandbox import FunctionCode
-from algosentinel.resilience.errors import SubagentError
+from google.genai import errors as genai_errors
+
+from algosentinel.resilience.errors import (
+    QuotaExhaustedError,
+    RateLimitError,
+    SubagentError,
+)
 from algosentinel.resilience.rate_limiter import TokenBucketRateLimiter
 from algosentinel.resilience.retry import with_retry
 from algosentinel.tools.registry import ToolRegistry
@@ -59,15 +65,25 @@ class FunctionAnalysisSubagent:
 
     @with_retry()
     def _generate(self, declarations: list, tool_config: genai_types.Tool) -> object:
-        return self._client.models.generate_content(
-            model=settings.gemini_model,
-            contents=self._messages,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=SUBAGENT_SYSTEM_PROMPT,
-                tools=[tool_config],
-                max_output_tokens=settings.gemini_max_tokens,
-            ),
-        )
+        try:
+            return self._client.models.generate_content(
+                model=settings.gemini_model,
+                contents=self._messages,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=SUBAGENT_SYSTEM_PROMPT,
+                    tools=[tool_config],
+                    max_output_tokens=settings.gemini_max_tokens,
+                    thinking_config=genai_types.ThinkingConfig(
+                        thinking_budget=settings.gemini_thinking_budget
+                    ),
+                ),
+            )
+        except genai_errors.ClientError as e:
+            if e.code == 429:
+                if "PerDay" in str(e):
+                    raise QuotaExhaustedError(str(e)) from e
+                raise RateLimitError(str(e)) from e
+            raise
 
     def run(self) -> ComplexityReport:
         registry = ToolRegistry.get()
@@ -95,8 +111,25 @@ class FunctionAnalysisSubagent:
             if not response.candidates:
                 continue
 
+            content = response.candidates[0].content
+            if content is None or not content.parts:
+                self._messages.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": (
+                                    "Continue with the next analysis step, or return "
+                                    "the final ComplexityReport JSON if all steps are done."
+                                )
+                            }
+                        ],
+                    }
+                )
+                continue
+
             has_tool_call = False
-            for part in response.candidates[0].content.parts:
+            for part in content.parts:
                 if part.function_call:
                     has_tool_call = True
                     self._tool_calls_made += 1
@@ -140,7 +173,7 @@ class FunctionAnalysisSubagent:
                     )
 
             if not has_tool_call:
-                for part in response.candidates[0].content.parts:
+                for part in content.parts:
                     if part.text:
                         raw = part.text.strip()
                         if raw.startswith("```"):

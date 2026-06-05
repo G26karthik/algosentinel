@@ -6,9 +6,10 @@ class Settings(BaseSettings):
     github_token: str = ""
     github_webhook_secret: str = ""
 
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
     gemini_max_rpm: int = 14
     gemini_max_tokens: int = 8192
+    gemini_thinking_budget: int = 0
     context_compress_every_n_calls: int = 6
     max_input_size_benchmark: int = 10000
     sandbox_timeout_seconds: int = 30

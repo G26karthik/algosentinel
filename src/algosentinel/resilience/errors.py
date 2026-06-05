@@ -60,3 +60,13 @@ class SubagentTimeoutError(SubagentError, RetryableError):
 
 class RateLimitError(RetryableError):
     pass
+
+
+class QuotaExhaustedError(FatalError):
+    """A per-day (or otherwise non-recoverable) quota was hit.
+
+    Distinct from RateLimitError: retrying within the same session cannot
+    succeed and would only burn the remaining quota, so this is fatal.
+    """
+
+    pass
