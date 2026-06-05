@@ -1,11 +1,8 @@
-"""Demo module for complexity regression audit (O(n) baseline on main)."""
-
+"""Demo module — intentional O(n^2) regression for agent audit."""
 
 def find_duplicates(lst):
-    seen = set()
     result = []
-    for x in lst:
-        if x in seen:
+    for i, x in enumerate(lst):
+        if x in lst[:i]:
             result.append(x)
-        seen.add(x)
     return result
