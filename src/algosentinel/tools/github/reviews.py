@@ -51,12 +51,14 @@ class MergePRInput(BaseModel):
 def post_pr_review(inp: PostPRReviewInput) -> ReviewResult:
     gh_repo = _get_repo(inp.repo)
     pr = gh_repo.get_pull(inp.pr_number)
-    comments = [
-        {"path": c.path, "line": c.line, "body": c.body, "side": c.side}
-        for c in inp.comments
-    ]
+    payload = {"body": inp.body, "event": inp.event}
+    if inp.comments:
+        payload["comments"] = [
+            {"path": c.path, "line": c.line, "body": c.body, "side": c.side}
+            for c in inp.comments
+        ]
     try:
-        review = pr.create_review(body=inp.body, event=inp.event, comments=comments or None)
+        review = pr.create_review(**payload)
     except GithubException as e:
         _handle_github_error(e)
         raise

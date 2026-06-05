@@ -28,7 +28,22 @@ def _inline_json_schema(schema: dict) -> dict:
     result = resolve(copy.deepcopy(schema))
     if isinstance(result, dict):
         result.pop("$defs", None)
-    return result
+    return _sanitize_schema_for_gemini(result)
+
+
+def _sanitize_schema_for_gemini(node: Any) -> Any:
+    """Gemini FunctionDeclaration requires string enum values, not integers."""
+    if isinstance(node, dict):
+        out = {}
+        for key, value in node.items():
+            out[key] = _sanitize_schema_for_gemini(value)
+        if "enum" in out and out["enum"] and all(isinstance(x, int) for x in out["enum"]):
+            out["enum"] = [str(x) for x in out["enum"]]
+            out["type"] = "string"
+        return out
+    if isinstance(node, list):
+        return [_sanitize_schema_for_gemini(item) for item in node]
+    return node
 
 
 @dataclass

@@ -10,7 +10,8 @@ from algosentinel.agent.planner import build_plan
 from algosentinel.config import settings
 from algosentinel.models.reports import AuditSummary
 from algosentinel.models.tools import ToolCallRecord
-from algosentinel.resilience.errors import FatalError
+from google.genai import errors as genai_errors
+from algosentinel.resilience.errors import FatalError, RateLimitError
 from algosentinel.resilience.rate_limiter import TokenBucketRateLimiter
 from algosentinel.resilience.retry import with_retry
 from algosentinel.tools.registry import ToolRegistry
@@ -29,19 +30,24 @@ class AgentLoop:
         self._log = logger.bind(component="AgentLoop")
         self._reports: list = []
 
-    @with_retry()
+    @with_retry(max_attempts=6, min_wait=2.0, max_wait=90.0)
     def _generate(self, messages: list, tool_config: genai_types.Tool, system: str):
-        return self._client.models.generate_content(
-            model=settings.gemini_model,
-            contents=[
-                {"role": "user", "parts": [{"text": system}]},
-                *messages,
-            ],
-            config=genai_types.GenerateContentConfig(
-                tools=[tool_config],
-                max_output_tokens=settings.gemini_max_tokens,
-            ),
-        )
+        try:
+            return self._client.models.generate_content(
+                model=settings.gemini_model,
+                contents=[
+                    {"role": "user", "parts": [{"text": system}]},
+                    *messages,
+                ],
+                config=genai_types.GenerateContentConfig(
+                    tools=[tool_config],
+                    max_output_tokens=settings.gemini_max_tokens,
+                ),
+            )
+        except genai_errors.ClientError as e:
+            if e.code == 429:
+                raise RateLimitError(str(e)) from e
+            raise
 
     def run(self, repo: str, pr_numbers: list[int]) -> AuditSummary:
         registry = ToolRegistry.get()
