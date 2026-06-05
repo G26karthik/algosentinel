@@ -1,0 +1,12 @@
+{
+  "id": "case_001",
+  "description": "O(n) → O(n^2): linear scan replaced by nested lookup",
+  "pre_code": "def find_duplicates(lst):\n    seen = set()\n    result = []\n    for x in lst:\n        if x in seen:\n            result.append(x)\n        seen.add(x)\n    return result",
+  "post_code": "def find_duplicates(lst):\n    result = []\n    for i, x in enumerate(lst):\n        if x in lst[:i]:\n            result.append(x)\n    return result",
+  "function_name": "find_duplicates",
+  "expected_pre_class": "O(n)",
+  "expected_post_class": "O(n^2)",
+  "expected_regression": true,
+  "expected_severity": "moderate",
+  "fix_should_restore_to": "O(n)"
+}

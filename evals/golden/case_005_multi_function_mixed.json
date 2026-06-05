@@ -1,0 +1,28 @@
+{
+  "id": "case_005",
+  "description": "Two functions — one regressed, one did not",
+  "functions": [
+    {
+      "id": "case_005a",
+      "description": "regressed function",
+      "pre_code": "def count_pairs(arr):\n    return sum(1 for i in range(len(arr)) for j in range(i))",
+      "post_code": "def count_pairs(arr):\n    c = 0\n    for i in range(len(arr)):\n        for j in range(len(arr)):\n            if j < i:\n                c += 1\n    return c",
+      "function_name": "count_pairs",
+      "expected_pre_class": "O(n^2)",
+      "expected_post_class": "O(n^2)",
+      "expected_regression": false,
+      "expected_severity": "none"
+    },
+    {
+      "id": "case_005b",
+      "description": "linear to quadratic regression",
+      "pre_code": "def unique_count(arr):\n    return len(set(arr))",
+      "post_code": "def unique_count(arr):\n    u = []\n    for x in arr:\n        if x not in u:\n            u.append(x)\n    return len(u)",
+      "function_name": "unique_count",
+      "expected_pre_class": "O(n)",
+      "expected_post_class": "O(n^2)",
+      "expected_regression": true,
+      "expected_severity": "moderate"
+    }
+  ]
+}
