@@ -12,3 +12,6 @@ build/
 .coverage
 htmlcov/
 *.log
+
+# Local submission helpers — never pushed
+submission/
